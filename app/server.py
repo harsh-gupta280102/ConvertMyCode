@@ -41,7 +41,7 @@ app.add_middleware(
 # Request / Response Models
 class ValidateKeyRequest(BaseModel):
     api_key: str
-    model: str = "gemini-2.5-flash"
+    model: str = "gemini-3.6-flash"
 
 class ScanPathRequest(BaseModel):
     folder_path: str
@@ -51,14 +51,14 @@ class ConvertFileRequest(BaseModel):
     file_path: str
     code: str
     target_extension: str
-    model: str = "gemini-2.5-flash"
+    model: str = "gemini-3.6-flash"
     strictness: str = "strict"
     project_summary: str = ""
     custom_instructions: Optional[str] = None
 
 class BatchConvertRequest(BaseModel):
     api_key: str
-    model: str = "gemini-2.5-flash"
+    model: str = "gemini-3.6-flash"
     strictness: str = "strict"
     project_summary: str = ""
     custom_instructions: Optional[str] = None
@@ -84,7 +84,7 @@ async def get_models():
     """Returns available Gemini models"""
     return {
         "models": AVAILABLE_MODELS,
-        "default": "gemini-2.5-flash"
+        "default": "gemini-3.6-flash"
     }
 
 @app.post("/api/validate-key")
@@ -216,19 +216,26 @@ async def load_sample(sample_id: str):
 @app.post("/api/convert-file")
 async def convert_file(req: ConvertFileRequest):
     """Converts a single JavaScript file to TypeScript via Gemini API"""
-    logger.info(f"[/api/convert-file] Converting {req.file_path} ({len(req.code)} chars) with {req.model}")
-    result = GeminiService.convert_file(
-        api_key=req.api_key,
-        code=req.code,
-        file_path=req.file_path,
-        target_extension=req.target_extension,
-        model=req.model,
-        strictness=req.strictness,
-        project_summary=req.project_summary,
-        custom_instructions=req.custom_instructions
-    )
-    logger.info(f"[/api/convert-file] Result for {req.file_path}: success={result.get('success')}, code_len={len(result.get('converted_code', ''))}, error={result.get('error')}")
-    return result
+    try:
+        logger.info(f"[/api/convert-file] Converting {req.file_path} ({len(req.code)} chars) with {req.model}")
+        result = GeminiService.convert_file(
+            api_key=req.api_key,
+            code=req.code,
+            file_path=req.file_path,
+            target_extension=req.target_extension,
+            model=req.model,
+            strictness=req.strictness,
+            project_summary=req.project_summary,
+            custom_instructions=req.custom_instructions
+        )
+        logger.info(f"[/api/convert-file] Result for {req.file_path}: success={result.get('success')}, code_len={len(result.get('converted_code', ''))}, error={result.get('error')}")
+        return result
+    except Exception as e:
+        logger.error(f"[/api/convert-file] Unhandled exception for {req.file_path}: {e}", exc_info=True)
+        return JSONResponse(
+            status_code=500,
+            content={"success": False, "error": f"Internal server error: {str(e)}"}
+        )
 
 @app.post("/api/batch-convert")
 async def batch_convert(req: BatchConvertRequest):
